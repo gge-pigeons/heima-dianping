@@ -42,7 +42,6 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
         //放行
         return true;
     }
-
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, @Nullable Exception ex) throws Exception {
         UserHolder.removeUser();
