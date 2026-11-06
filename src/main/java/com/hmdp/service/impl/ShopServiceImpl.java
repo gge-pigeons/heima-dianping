@@ -63,10 +63,18 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Shop shop = JSONUtil.toBean(shopJson,Shop.class);
             return Result.ok(shop);
         }
+        //判断命中的值是否是空，如果是空应该直接结束，不能够再查数据库
+        //上面已经判断了isNotBlank，没有从上方if返回，说明缓存中要么为null，没有这个值，要么为“”空值
+        if(shopJson!=null){
+            //返回一个错误信息
+            return Result.fail("店铺信息不存在");
+        }
         //4.不存在，根据id查询数据库
         Shop shop = getById(id);
         //5.不存在，返回错误
         if(shop==null){
+            //将空值写入Redis
+            stringRedisTemplate.opsForValue().set(key,"",CACHE_NULL_TTL, TimeUnit.MINUTES);
             return Result.fail("店铺不存在!");
         }
         //6.存在，将数据写入Redis
