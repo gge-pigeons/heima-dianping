@@ -107,7 +107,7 @@ public class CacheClient {
                 //查询数据库
                 R r1 = dbFallback.apply(id);
                 //写到Redis
-                this.setWithLogicalExpire(key,);
+                this.setWithLogicalExpire(key,r1,time,unit);
                 //释放锁
                 unlock(lockKey);
             });
