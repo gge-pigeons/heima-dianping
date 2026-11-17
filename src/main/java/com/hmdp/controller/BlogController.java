@@ -32,17 +32,33 @@ public class BlogController {
     @Resource
     private IUserService userService;
 
-    @PostMapping
-    public Result saveBlog(@RequestBody Blog blog) {
-        // 获取登录用户
-        UserDTO user = UserHolder.getUser();
-        blog.setUserId(user.getId());
-        // 保存探店博文
-        blogService.save(blog);
-        // 返回id
-        return Result.ok(blog.getId());
+
+    /**
+     * 查询关注人的更新博客
+     * @return
+     */
+    @GetMapping("/of/follow")
+    public Result queryBlogOfFollw(
+            @RequestParam("lastId") Long max,@RequestParam(value = "offset",defaultValue="0")Integer offset
+    ){
+        return blogService.queryBlogOfFollow(max,offset);
     }
 
+    /**
+     * 发布笔记
+     * @param blog
+     * @return
+     */
+    @PostMapping
+    public Result saveBlog(@RequestBody Blog blog) {
+        return blogService.saveBlog(blog);
+    }
+
+    /**
+     * 通过笔记id给笔记点赞
+     * @param id
+     * @return
+     */
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
         return blogService.likeBlog(id);
@@ -73,5 +89,17 @@ public class BlogController {
     @GetMapping("/likes/{id}")
     public Result queryBlogLikes(@PathVariable ("id") Long id){
         return blogService.queryBlogLikes(id);
+    }
+
+    @GetMapping("/of/user")
+    public Result queryBlogByUserId(
+            @RequestParam(value = "current", defaultValue = "1") Integer current,
+            @RequestParam("id") Long id) {
+        // 根据用户查询
+        Page<Blog> page = blogService.query()
+                .eq("user_id", id).page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+        // 获取当前页数据
+        List<Blog> records = page.getRecords();
+        return Result.ok(records);
     }
 }
