@@ -12,9 +12,11 @@ import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.statement.select.KSQLWindow;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import com.hmdp.utils.SystemConstants;
@@ -22,7 +24,10 @@ import com.hmdp.utils.SystemConstants;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -42,15 +47,72 @@ import static com.hmdp.utils.SystemConstants.*;
 //这里继承了ServiceImpl，是Mybatis-plus的用法，后面还指定了实体类和mapper
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
 
+    @Override
+    public Result signCount() {
+        //获取当前登录用户
+        Long userId = UserHolder.getUser().getId();
+        //获取日期
+        LocalDateTime now = LocalDateTime.now();
+        //拼接key
+        String keySuffix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        String key = "sign:"+userId+keySuffix;
+        //获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //获取本月截至今天为止的所有签到数据,返回的是一个十进制的数字
+        List<Long> result = stringRedisTemplate.opsForValue().bitField(key,
+                BitFieldSubCommands.create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth))
+                        .valueAt(0)
+                );
+        if(result==null||result.isEmpty()){
+            return Result.ok(0);
+        }
+        Long num  = result.get(0);
+        if(num==null||num==0){
+            return Result.ok(0);
+        }
+        //循环遍历
+        int count=0;
+        while(true){
+            //让这个数字与1做与运算，然后右移，最终与运算结果为1的数量就是截至今天为止连续签到天数
+            if((num&1)==0){
+                //如果为0说明未签到结束
+                break;
+            }else{
+                count++;
+            }
+            num=num>>1;
+        }
+        return Result.ok(count);
+    }
+
+    @Override
+    public Result sign() {
+        //获取当前登录用户
+        Long userId = UserHolder.getUser().getId();
+        //获取日期
+        LocalDateTime now = LocalDateTime.now();
+        //拼接key
+        String keySuffix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        String key = "sign:"+userId+keySuffix;
+        //获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //写入redis SETBIT KEY OFFSET 1
+        stringRedisTemplate.opsForValue().setBit(key,dayOfMonth-1,true);
+        return Result.ok();
+    }
+
+
+
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
     /**
      * 用户登录
      * @param loginForm
      * @param session
      * @return
      */
-
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
 
     public Result login(LoginFormDTO loginForm, HttpSession session) {
         //1.校验手机号
